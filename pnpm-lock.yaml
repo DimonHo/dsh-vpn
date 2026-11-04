@@ -1,0 +1,98 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@pkgship/mihomo':
+        specifier: 1.19.33
+        version: 1.19.33
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.1
+
+packages:
+
+  '@pkgship/mihomo-android-arm64@1.19.33':
+    resolution: {integrity: sha512-Qo1BtSfQU6WSFbdyPNCV5m01M/Dp4kQ26vwgBUPvhP/rzfbBfC7+ggp8ud1OpggAAW4BKDigMrFnZCM6TeKUIA==}
+    cpu: [arm64]
+    os: [android]
+
+  '@pkgship/mihomo-darwin-amd64@1.19.33':
+    resolution: {integrity: sha512-CP9op1kg7YXuUn6wuXtFTBjwgazEO+7vIvDuK8bxSQznT6CSpIRX7sUUNXSFJ/vOdhh/vL7rJK00XlVy15p/AQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@pkgship/mihomo-darwin-arm64@1.19.33':
+    resolution: {integrity: sha512-00qvdLBiVo5ZX7YrSIYs5Nvk0sMvi7ODOoFHHak+SNaxgXHjx+oeNjOg5lfgTOYMy52mdrlDUSTJjj+umoVyWA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@pkgship/mihomo-linux-amd64@1.19.33':
+    resolution: {integrity: sha512-jxxwy+bxy6eAOlSSSNeLr5lTv0QYLKnZgSKS0w2Telgq76zD4SkaNeL7pEWE8QaENVA4QTv/06AN+lkChmvL8w==}
+    cpu: [x64]
+    os: [linux]
+
+  '@pkgship/mihomo-linux-arm64@1.19.33':
+    resolution: {integrity: sha512-uEiVxsaPTs9iYhnMljcVHAcKGFsvnpnUbRE7AqrMx2EcTn6vZunJhdGKq6eh39B8eSKF1CXFnUbF4MrboolYTg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@pkgship/mihomo-windows-amd64@1.19.33':
+    resolution: {integrity: sha512-X38SrchdPhILE4Ms8vWzicldZXM5bCHJDmo7q5SeCO+wRvOat6a8m8mZ5ZZDSYbaWfqluxzCg4BUXb6DAkmSww==}
+    cpu: [x64]
+    os: [win32]
+
+  '@pkgship/mihomo-windows-arm64@1.19.33':
+    resolution: {integrity: sha512-82uwtR3B6qSU63AI9ozxRsHTdn8WUQNxLiars+R4IyuZxiXMMGpgus2U+zVnU32RRRJZyvabMczbLcaD2L+FDg==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@pkgship/mihomo@1.19.33':
+    resolution: {integrity: sha512-yd0yuAh3xjkUk6gfKxxQHpIqdJREZIIo5Q+zFvRBtitkT9YY/vLR02k3DokpbFOJIt+sAu6EsbBNZogY/w9NPQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  yaml@2.9.1:
+    resolution: {integrity: sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
+snapshots:
+
+  '@pkgship/mihomo-android-arm64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-darwin-amd64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-darwin-arm64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-linux-amd64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-linux-arm64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-windows-amd64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo-windows-arm64@1.19.33':
+    optional: true
+
+  '@pkgship/mihomo@1.19.33':
+    optionalDependencies:
+      '@pkgship/mihomo-android-arm64': 1.19.33
+      '@pkgship/mihomo-darwin-amd64': 1.19.33
+      '@pkgship/mihomo-darwin-arm64': 1.19.33
+      '@pkgship/mihomo-linux-amd64': 1.19.33
+      '@pkgship/mihomo-linux-arm64': 1.19.33
+      '@pkgship/mihomo-windows-amd64': 1.19.33
+      '@pkgship/mihomo-windows-arm64': 1.19.33
+
+  yaml@2.9.1: {}
