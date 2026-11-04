@@ -1,59 +1,113 @@
-# 外网连接 / External Network
+# DSH VPN · 外网连接
 
-A subscription-driven outbound proxy plugin for DeepSeek Harness.
+为 DeepSeek Harness 提供基于订阅的出站代理功能：导入订阅、选择节点、连接代理并测试出口 IP，全部在 DSH 设置页面中完成。
 
-- **Settings → 外网连接** — paste a Clash / mihomo subscription URL (or a Base64 node list), pick a node, connect, test the exit IP.
-- **Harness-scoped routing** — while connected, the plugin installs DSH's process-wide HTTP proxy policy. Model requests, `web_search` / `web_fetch`, MCP, and subprocesses started afterwards use the selected node.
-- **No system changes** — no system proxy, no TUN, no firewall or routing-table edits.
-- **Local only** — the mixed HTTP/SOCKS proxy binds `127.0.0.1` on a random port; the management API is registered on the existing DSH Web server.
-- **Agent tool** — `vpn_connection` exposes status, subscribe, connect, disconnect, select, and test to the agent.
+> 本插件仅为 DSH 及其后续启动的子进程提供代理，不是系统级 VPN，不启用 TUN，也不修改系统代理、防火墙或路由表。
 
-## Usage
+## 安装
 
-1. Open **Settings** (sidebar foot) → **外网连接**.
-2. Paste the subscription URL and press **保存并解析**.
-3. Choose a node, then press **连接**.
-4. Press **测试出口** to check the public exit IP.
-5. **断开** restores direct access and removes the proxy environment for new subprocesses.
+### 命令行安装
 
-The subscription may be:
+在运行 DSH 的机器上执行（需要已安装 Git）：
 
-- A Clash / Clash.Meta / mihomo YAML document with an inline `proxies` list.
-- A Base64-encoded or plain URI list containing `ss`, `vmess`, `trojan`, `vless` (including Reality), `hysteria2`, `tuic`, `socks5`, or `http` nodes.
+```bash
+dsh plugin --profile web add 'git+https://github.com/DimonHo/dsh-vpn.git'
+```
 
-Subscription groups and rules are ignored: the plugin creates one deterministic `select` group and uses `MATCH` for all non-local traffic. Local, loopback, and RFC1918 destinations stay direct. Clash `hosts` overrides are preserved, because some providers publish pseudo hostnames in `server` and map them to real CDN names there.
+仓库已公开，无需登录 GitHub。使用自定义 profile 时，将 `web` 替换为实际名称。
 
-## Files and data
+安装后刷新 DSH 页面，在 **设置 → 外网连接** 中使用。若未出现，重启 DSH。
 
-The plugin lives at this package root. Runtime data is under `.data/`:
+### 插件管理页面安装
 
-| File | Purpose |
+打开 **插件管理 → 添加插件**，输入以下 Git 地址并安装：
+
+```text
+git+https://github.com/DimonHo/dsh-vpn.git
+```
+
+### 卸载
+
+```bash
+dsh plugin --profile web remove @local/dsh-vpn
+```
+
+卸载前建议先断开连接；需要保留订阅配置时，请提前妥善备份运行数据。
+
+## 主要功能
+
+- **订阅导入**：支持 Clash / mihomo YAML 订阅，以及 Base64 编码或明文节点链接列表。
+- **节点切换**：在设置页面选择节点、连接或断开代理。
+- **出口测试**：检查当前公网出口 IP。
+- **DSH 范围代理**：连接后应用 DSH 进程级 HTTP 代理策略，供模型请求、`web_search` / `web_fetch`、MCP 和后续启动的子进程使用。
+- **本地监听**：HTTP/SOCKS 混合代理仅绑定 `127.0.0.1` 的随机端口，管理接口复用现有 DSH Web 服务。
+- **智能体工具**：提供 `vpn_connection`，支持查询状态、导入订阅、连接、断开、切换节点和测试出口。
+
+## 使用方法
+
+1. 打开侧边栏底部的 **设置 → 外网连接**。
+2. 粘贴订阅地址，点击 **保存并解析**。
+3. 选择一个节点，点击 **连接**。
+4. 点击 **测试出口**，检查公网 IP。
+5. 不再需要代理时点击 **断开**，恢复直接连接，并移除后续子进程的代理环境配置。
+
+在其他 DSH 安装本插件后，需要重新填写订阅；仓库不包含个人订阅、节点凭据或运行配置。
+
+### 支持的订阅格式
+
+- 包含内联 `proxies` 列表的 Clash / Clash.Meta / mihomo YAML 文档。
+- Base64 编码或明文 URI 列表，支持 `ss`、`vmess`、`trojan`、`vless`（含 Reality）、`hysteria2`、`tuic`、`socks5` 和 `http` 节点。
+
+插件不沿用订阅中的代理组和分流规则，而是创建一个固定的 `select` 代理组，通过 `MATCH` 规则代理非本地流量。本地、回环和 RFC1918 私有地址保持直连。
+
+订阅中的 Clash `hosts` 映射会保留，以兼容在节点 `server` 中使用特殊域名、再通过 `hosts` 映射到真实 CDN 地址的订阅。
+
+## 数据与安全
+
+运行数据保存在插件目录下的 `.data/` 中：
+
+| 相对路径 | 用途 |
 |---|---|
-| `.data/state.json` | Subscription URL, parsed nodes, selected node, quota metadata (mode `0600`). |
-| `.data/config.yaml` | Generated mihomo configuration while connected (mode `0600`). |
-| `.data/mihomo` | Optional downloaded core when the packaged binary is unavailable. |
+| `.data/state.json` | 订阅地址、解析后的节点、所选节点及配额信息，权限为 `0600`。 |
+| `.data/config.yaml` | 连接时生成的 mihomo 配置，权限为 `0600`。 |
+| `.data/mihomo` | 打包内核不可用时下载的备用内核。 |
 
-The directory is owner-only (`0700`). Removing the subscription deletes the state; uninstalling the plugin leaves `.data/` in the checkout so it can be removed manually.
+数据目录权限为 `0700`，仅允许所有者访问。移除订阅会删除保存的订阅状态。
 
-## Core
+**这些数据可能包含订阅令牌和节点密码，请勿公开或提交到 Git。** 仓库已通过 `.gitignore` 排除 `.data/`、依赖目录和环境变量文件。卸载后若仍有残留数据，可在确认不再需要后手动删除；不要依赖卸载保留数据。
 
-The bundled Linux binary comes from [`@pkgship/mihomo-linux-amd64`](https://www.npmjs.com/package/@pkgship/mihomo-linux-amd64) via [`@pkgship/mihomo`](https://www.npmjs.com/package/@pkgship/mihomo), version `1.19.33`, which packages [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo). mihomo is licensed **GPL-3.0-or-later**; the plugin source is separate and does not relicense the core. If the platform package is missing, the plugin falls back to downloading the pinned Linux release from GitHub; set `DSH_VPN_CORE_PATH` to use a locally installed mihomo instead.
+## 内核与平台
 
-## Limitations
+插件通过 [`@pkgship/mihomo`](https://www.npmjs.com/package/@pkgship/mihomo) 使用版本为 `1.19.33` 的 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 内核，Linux AMD64 二进制由 [`@pkgship/mihomo-linux-amd64`](https://www.npmjs.com/package/@pkgship/mihomo-linux-amd64) 提供。
 
-- Only the Harness process tree is routed. Other applications on the machine are unaffected.
-- No TUN, no system-wide DNS changes, no OS proxy toggling.
-- The subscription must be reachable while disconnected (or through any proxy already configured for DSH).
-- If the selected node cannot reach a service the Harness depends on, that service will fail while connected. Disconnect to restore direct access.
-- The management page is a React slot contribution in the existing DSH Web UI; it does not replace the app root, open an iframe, or read another plugin's DOM.
+若对应平台包不可用，插件会尝试从 GitHub 下载固定版本的 Linux 内核。也可通过环境变量指定已安装的 mihomo：
 
-## Development
+```bash
+export DSH_VPN_CORE_PATH=/absolute/path/to/mihomo
+```
+
+请在启动 DSH 前设置该变量。默认内核方案面向 Linux；其他系统可能需要自行提供适配平台的 mihomo，兼容性需另行验证。
+
+mihomo 使用 **GPL-3.0-or-later** 许可证；插件源码与内核分开，插件的许可证声明不会改变内核的许可证。
+
+## 使用限制
+
+- 代理范围仅限 DSH 进程树，不影响机器上的其他应用。
+- 不提供 TUN、系统级 DNS 修改或系统代理切换。
+- 导入订阅时，订阅地址必须能通过当前直连网络或 DSH 已配置的代理访问。
+- 如果所选节点无法访问 DSH 依赖的服务，连接期间对应请求会失败；断开代理可恢复直连。
+- 管理页面通过 React 插槽集成到现有 DSH Web 界面，不替换应用根节点、不使用 iframe，也不读取其他插件的 DOM。
+
+## 开发
+
+安装依赖并检查 JavaScript 语法：
 
 ```bash
 pnpm install
 node --check index.js
 node --check client.js
-node --test test/subscription.test.mjs # when present
+node --check lib/subscription.js
+node --check lib/mihomo.js
 ```
 
-The Host half is plain ESM. The Client half is a lazy `window.__ModuleLoader__` factory and imports only `react` from the browser module table.
+Host 端使用原生 ESM；Client 端采用延迟执行的 `window.__ModuleLoader__` 工厂，并仅从浏览器模块表导入 `react`。
