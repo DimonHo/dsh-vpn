@@ -34,7 +34,7 @@ const NS = 'dsh-vpn';
 const API_PATH = '/dsh-vpn/api';
 const STATE_PATH = path.join(DATA_DIR, 'state.json');
 const MAX_SUBSCRIPTION_BYTES = 6 * 1024 * 1024;
-const MAX_REQUEST_BYTES = 64 * 1024;
+const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 const EGRESS_URLS = ['https://ifconfig.me/ip', 'https://api.ipify.org?format=json', 'https://ipinfo.io/ip'];
 const DELAY_URL = 'https://www.gstatic.com/generate_204';
 
@@ -134,18 +134,22 @@ export function apply(ctx, config = {}) {
       ctx.tools.register({
         name: 'vpn_connection',
         description:
-          'Inspect or control the Harness VPN. Use status before acting, subscribe to load a Clash or base64 subscription, connect to route the harness through the selected node, disconnect to restore direct access, select to choose a node, and test to report the current exit IP.',
+          'Inspect or control the Harness VPN. Use status before acting, subscribe to load a Clash or base64 subscription URL, import to load raw Clash YAML or a base64 node list, connect to route the harness through the selected node, disconnect to restore direct access, select to choose a node, and test to report the current exit IP.',
         parameters: {
           type: 'object',
           additionalProperties: false,
           properties: {
             action: {
               type: 'string',
-              description: 'One of: status, subscribe, connect, disconnect, select, test.',
+              description: 'One of: status, subscribe, import, connect, disconnect, select, test.',
             },
             url: {
               type: 'string',
               description: 'Subscription URL for the subscribe action.',
+            },
+            content: {
+              type: 'string',
+              description: 'Raw Clash YAML or base64/plain node list for the import action.',
             },
             node: {
               type: 'string',
@@ -176,6 +180,11 @@ export function apply(ctx, config = {}) {
           if (action === 'subscribe') {
             if (typeof args?.url !== 'string' || args.url.trim() === '') throw new Error('subscribe 需要 url 参数');
             await enqueue(() => updateSubscription(args.url));
+            return { ok: true, message: statusMessage() };
+          }
+          if (action === 'import') {
+            if (typeof args?.content !== 'string' || args.content.trim() === '') throw new Error('import 需要 content 参数');
+            await enqueue(() => importSubscription(args.content));
             return { ok: true, message: statusMessage() };
           }
           if (action === 'connect') {
@@ -329,7 +338,7 @@ function statusMessage() {
     return `已连接${location}（本地端口 ${runtime.port}${exit}）${inventory}`;
   }
   if (runtime.phase === 'error' && runtime.lastError) return `未连接：${runtime.lastError}${inventory}`;
-  return state.subscriptionUrl
+  return state.nodes.length > 0
     ? `未连接；已保存 ${state.nodes.length} 个节点${location}${inventory}`
     : '未连接；尚未配置订阅';
 }
@@ -392,6 +401,10 @@ async function dispatch(action, message) {
   if (action === 'state') return { state: publicState() };
   if (action === 'subscribe') {
     await enqueue(() => updateSubscription(String(message.url ?? '')));
+    return { state: publicState() };
+  }
+  if (action === 'import') {
+    await enqueue(() => importSubscription(String(message.content ?? '')));
     return { state: publicState() };
   }
   if (action === 'clear') {
@@ -466,13 +479,43 @@ async function updateSubscription(rawUrl) {
     throw new Error(errorMessage(error));
   }
 
-  state.subscriptionUrl = url;
+  return applySubscription(result, {
+    url,
+    userinfo: parseUserinfo(response.headers.get('subscription-userinfo')) ?? state.userinfo,
+  });
+}
+
+/**
+ * Import a raw Clash YAML document (or base64/plain URI list) from the UI. It
+ * has no URL to update from, so the stored URL is cleared and the cached nodes
+ * become the source of truth.
+ */
+async function importSubscription(rawContent) {
+  if (runtime.connected) throw new Error('请先断开连接，再导入配置');
+  const content = String(rawContent ?? '');
+  if (content.trim() === '') throw new Error('请粘贴 Clash YAML 或节点列表');
+  if (Buffer.byteLength(content, 'utf8') > MAX_SUBSCRIPTION_BYTES) {
+    throw new Error(`配置内容超过 ${Math.round(MAX_SUBSCRIPTION_BYTES / 1024 / 1024)} MB`);
+  }
+  if (content.trim().startsWith('<')) throw new Error('内容看起来是网页而不是 YAML 配置');
+
+  let result;
+  try {
+    result = parseSubscription(content);
+  } catch (error) {
+    throw new Error(errorMessage(error));
+  }
+  return applySubscription(result, { url: '', userinfo: null });
+}
+
+async function applySubscription(result, options) {
+  state.subscriptionUrl = options.url;
   state.nodes = result.nodes;
   state.hosts = result.hosts ?? {};
   state.format = result.format;
   state.warnings = result.warnings;
   state.updatedAt = new Date().toISOString();
-  state.userinfo = parseUserinfo(response.headers.get('subscription-userinfo')) ?? state.userinfo;
+  state.userinfo = options.userinfo ?? null;
   if (!state.nodes.some((node) => node.name === state.selected)) state.selected = state.nodes[0]?.name ?? '';
   runtime.lastError = null;
   await saveState();

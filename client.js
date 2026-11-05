@@ -31,6 +31,15 @@ window.__ModuleLoader__.load({
       subscriptionTitle: 'Subscription',
       subscriptionHint: 'Paste a Clash / mihomo subscription URL, or a base64 node list. Nodes are parsed locally.',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
+      urlMode: 'Subscription URL',
+      yamlMode: 'Paste YAML',
+      yamlHint: 'If this network cannot reach the subscription URL, paste the Clash / mihomo YAML directly. It is parsed locally.',
+      yamlPlaceholder: 'hosts:\n  "fake.example": "real.example"\nproxies:\n  - name: Example\n    type: ss\n    server: fake.example\n    port: 443\n    cipher: aes-128-gcm\n    password: …',
+      importYaml: 'Import config',
+      importing: 'Importing…',
+      yamlRequired: 'Paste a YAML config first.',
+      configImported: 'Config imported.',
+      yamlPrivacy: 'The raw text is cleared after import; only parsed nodes and hosts are saved.',
       saveSubscription: 'Save & parse',
       updating: 'Parsing…',
       clearSubscription: 'Remove',
@@ -108,6 +117,15 @@ window.__ModuleLoader__.load({
       subscriptionTitle: '订阅',
       subscriptionHint: '粘贴 Clash / mihomo 订阅链接，或 Base64 节点列表。节点在本地解析。',
       subscriptionPlaceholder: 'https://example.com/api/v1/client/subscribe?token=…',
+      urlMode: '订阅链接',
+      yamlMode: '粘贴 YAML',
+      yamlHint: '如果当前出口网络无法访问订阅链接，可以直接粘贴 Clash / mihomo YAML 配置，节点在本地解析。',
+      yamlPlaceholder: 'hosts:\n  "fake.example": "real.example"\nproxies:\n  - name: 示例节点\n    type: ss\n    server: fake.example\n    port: 443\n    cipher: aes-128-gcm\n    password: …',
+      importYaml: '导入配置',
+      importing: '导入中…',
+      yamlRequired: '请先粘贴 YAML 配置。',
+      configImported: '配置已导入。',
+      yamlPrivacy: '导入成功后原始文本会清空，只保存解析后的节点和 hosts 映射。',
       saveSubscription: '保存并解析',
       updating: '解析中…',
       clearSubscription: '删除',
@@ -196,9 +214,11 @@ window.__ModuleLoader__.load({
 .dshvpn-hero-actions{display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:132px}
 .dshvpn-btn{appearance:none;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);height:36px;padding:0 14px;border-radius:10px;font:inherit;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:background .15s ease,border-color .15s ease,opacity .15s ease}
 .dshvpn-btn:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
-.dshvpn-btn:disabled{opacity:.5;cursor:not-allowed}
-.dshvpn-btn.primary{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base)}
-.dshvpn-btn.primary:hover:not(:disabled){filter:brightness(1.06)}
+.dshvpn-btn:disabled{opacity:1;cursor:not-allowed;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2)}
+.dshvpn-root .dshvpn-btn.primary{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}
+.dshvpn-root .dshvpn-btn.primary:hover:not(:disabled){background:var(--dsw-alias-bg-overlay)}
+.dshvpn-root .dshvpn-btn.primary:disabled{color:var(--dsw-alias-label-secondary);border-color:var(--dsw-alias-border-l2)}
+.dshvpn-root .dshvpn-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .dshvpn-btn.danger{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary);background:transparent}
 .dshvpn-btn.danger:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
 .dshvpn-btn.link{height:auto;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-weight:500}
@@ -313,6 +333,8 @@ window.__ModuleLoader__.load({
     function Section(props) {
       const [snapshot, setSnapshot] = useState(null);
       const [urlDraft, setUrlDraft] = useState('');
+      const [inputMode, setInputMode] = useState('url');
+      const [yamlDraft, setYamlDraft] = useState('');
       const [busy, setBusy] = useState('');
       const [error, setError] = useState('');
       const [notice, setNotice] = useState('');
@@ -424,6 +446,18 @@ window.__ModuleLoader__.load({
         }
       }
 
+      async function importYaml() {
+        if (!yamlDraft.trim()) { setError(t('yamlRequired')); return; }
+        if (connected || working) return;
+        const data = await perform('import', () => request('import', { content: yamlDraft }));
+        if (data) {
+          setYamlDraft('');
+          setUrlDraft('');
+          setDelays({});
+          setNotice(`${t('configImported')} ${data.state.subscription.nodeCount} ${t('nodes')}`);
+        }
+      }
+
       async function connect() {
         const data = await perform('connect', () => request('connect'));
         if (!data) return;
@@ -477,6 +511,7 @@ window.__ModuleLoader__.load({
         const data = await perform('clear', () => request('clear'));
         if (data) {
           setUrlDraft('');
+          setYamlDraft('');
           setDelays({});
           setNotice(t('subscriptionCleared'));
         }
@@ -604,10 +639,29 @@ window.__ModuleLoader__.load({
               'div',
               null,
               h('h2', null, t('subscriptionTitle')),
-              h('p', null, t('subscriptionHint')),
+              h('p', null, t(inputMode === 'yaml' ? 'yamlHint' : 'subscriptionHint')),
             ),
           ),
-          h(
+          h('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+            ...['url', 'yaml'].map((mode) => h('button', {
+              key: mode, type: 'button', 'aria-pressed': inputMode === mode,
+              className: `dshvpn-btn${inputMode === mode ? ' primary' : ''}`,
+              disabled: working, onClick: () => setInputMode(mode),
+            }, t(mode === 'yaml' ? 'yamlMode' : 'urlMode')))),
+          inputMode === 'yaml' ? h('div', null,
+            h('textarea', {
+              className: 'dshvpn-input', rows: 12,
+              style: { width: '100%', height: 240, padding: 12, resize: 'vertical', fontFamily: 'monospace' },
+              'aria-label': t('yamlMode'), placeholder: t('yamlPlaceholder'),
+              spellCheck: false, autoComplete: 'off', value: yamlDraft,
+              disabled: connected || working, onChange: (event) => setYamlDraft(event.target.value),
+            }),
+            h('p', { className: 'dshvpn-muted' }, t('yamlPrivacy')),
+            h('button', { type: 'button', className: 'dshvpn-btn primary',
+              style: { marginTop: 10 }, disabled: connected || working || !yamlDraft.trim(),
+              onClick: importYaml,
+            }, t(busy === 'import' ? 'importing' : 'importYaml')),
+          ) : h(
             'div',
             { className: 'dshvpn-inputrow' },
             h('input', {
@@ -644,7 +698,7 @@ window.__ModuleLoader__.load({
               : null,
             userinfo?.expire ? h('span', null, `${t('expiresAt')} `, h('b', null, formatExpiry(userinfo.expire))) : null,
             h('span', null, `${t('traffic')} `, h('b', null, traffic)),
-            snapshot.subscription.url && !connected
+            snapshot.subscription.nodeCount > 0 && !connected
               ? h(
                   'button',
                   { type: 'button', className: 'dshvpn-btn link', disabled: working, onClick: clearSubscription },
